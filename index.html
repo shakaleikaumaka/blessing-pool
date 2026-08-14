@@ -164,7 +164,81 @@ a{color:#7cd3ff}
     }else{window.open('https://paypal.me/Shakalei/'+stA,'_blank');}}
   </script>
 
-  <h2>✦ JUMP IN — THREE LANES OPEN ✦</h2>
+
+  <div class="lane" id="x402lane">
+    <h3>🦊 LANE ZERO · x402 — THE AGENT LANE</h3>
+    <div style="color:#9d97c9;font-size:14px">the http-native rail (Coinbase × Cloudflare's 402 protocol): machines and foxes bless the pool with USDC on <b>Base</b> — settled on-chain in seconds, no accounts, no keys to ask for. <b>this lane feeds the agent-launch wallet directly</b> (0x2596…c934) — the ʻohana's own treasury. 🌊</div>
+    <div style="margin:14px 0 6px">
+      <input id="x402-amt" type="number" min="0.001" step="0.001" value="0.01" style="width:110px;background:#0b0710;border:1px solid #7c4ba8;color:#f5efe6;border-radius:10px;padding:8px 10px;font-size:15px;">
+      <span style="color:#9d97c9;font-size:13px"> USDC · pennies welcome 🦊</span>
+    </div>
+    <button class="copy" id="x402-go" style="background:linear-gradient(90deg,#0052ff,#7c4ba8)">🦊 BLESS WITH x402 (METAMASK)</button>
+    <div class="note" id="x402-status">agent? read the machine instructions at <a href="/x402-bless.json" style="color:#7fd8a4">/x402-bless.json</a> — sign, verify, settle, blessed. 🤖🌊</div>
+    <div class="note" id="x402-tx"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+  <script>
+  (function(){
+    var FACILITATOR='https://facilitator.payai.network';
+    var USDC='0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+    var PAYTO='0x25965899f4600b3AA5362ee4f34be95E5E62c934';
+    var BASE_CHAIN=8453;
+    var st=document.getElementById('x402-status'), tx=document.getElementById('x402-tx');
+    function say(m){ st.innerHTML=m; }
+    document.getElementById('x402-go').onclick=async function(){
+      try{
+        if(!window.ethereum){ say('🦊 no wallet found — install MetaMask (or any EIP-1193 fox) and come back 🌺'); return; }
+        if(typeof ethers==='undefined'){ say('⏳ loading the ethers library — one more tap in a moment…'); return; }
+        var amt=parseFloat(document.getElementById('x402-amt').value||'0.01');
+        if(!(amt>0)){ say('⚠️ pick an amount above zero'); return; }
+        say('🦊 connecting the fox…');
+        var provider=new ethers.BrowserProvider(window.ethereum);
+        await provider.send('eth_requestAccounts',[]);
+        var net=await provider.getNetwork();
+        if(Number(net.chainId)!==BASE_CHAIN){
+          say('🌉 switching to Base…');
+          try{ await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x2105'}]}); }
+          catch(e){ await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:'0x2105',chainName:'Base',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:['https://mainnet.base.org'],blockExplorerUrls:['https://basescan.org']}]}); }
+          provider=new ethers.BrowserProvider(window.ethereum);
+        }
+        var signer=await provider.getSigner();
+        var from=await signer.getAddress();
+        var value=BigInt(Math.round(amt*1e6));
+        var now=Math.floor(Date.now()/1000);
+        var nonce=ethers.hexlify(ethers.randomBytes(32));
+        var auth={from:from,to:PAYTO,value:value,validAfter:0,validBefore:now+300,nonce:nonce};
+        say('✍️ sign the blessing (EIP-3009 — gas-free for you, the pool settles it)…');
+        var sig=await signer.signTypedData(
+          {name:'USD Coin',version:'2',chainId:BASE_CHAIN,verifyingContract:USDC},
+          {TransferWithAuthorization:[
+            {name:'from',type:'address'},{name:'to',type:'address'},{name:'value',type:'uint256'},
+            {name:'validAfter',type:'uint256'},{name:'validBefore',type:'uint256'},{name:'nonce',type:'bytes32'}]},
+          auth);
+        var payload={x402Version:1,scheme:'exact',network:'base',payload:{signature:sig,authorization:{from:auth.from,to:auth.to,value:auth.value.toString(),validAfter:String(auth.validAfter),validBefore:String(auth.validBefore),nonce:auth.nonce}}};
+        var req={scheme:'exact',network:'base',maxAmountRequired:value.toString(),resource:'https://blessingpool.com/x402-bless.json',description:'a blessing for the pool 🌊 — every drop keeps a door open',mimeType:'application/json',payTo:PAYTO,maxTimeoutSeconds:300,asset:USDC,extra:{name:'USD Coin',version:'2'}};
+        say('🌊 verifying with the facilitator…');
+        var vr=await fetch(FACILITATOR+'/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({x402Version:1,paymentPayload:payload,paymentRequirements:req})});
+        var vj=await vr.json();
+        if(!vj.isValid){ say('⚠️ the facilitator did not bless it: '+(vj.invalidReason||'unknown')); return; }
+        say('🌊 settling on Base… (seconds)');
+        var sr=await fetch(FACILITATOR+'/settle',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({x402Version:1,paymentPayload:payload,paymentRequirements:req})});
+        var sj=await sr.json();
+        if(sj.success){
+          say('🌊🦊 <b>BLESSED.</b> the pool received your drop — mahalo!');
+          if(sj.transaction) tx.innerHTML='✦ on-chain forever: <a href="https://basescan.org/tx/'+sj.transaction+'" target="_blank" rel="noopener" style="color:#7fd8a4">'+sj.transaction.slice(0,14)+'…'+sj.transaction.slice(-8)+'</a> ✦';
+        } else {
+          say('⚠️ settlement hiccup: '+(sj.error||sj.errorReason||'unknown')+' — nothing left your wallet without success');
+        }
+      }catch(e){
+        if(e && e.code===4001){ say('🦊 declined for now — the pool waits patiently 🌺'); }
+        else if(e && e.action==='sendTransaction' && /insufficient/i.test(String(e))){ say('⚠️ not enough USDC on Base in this wallet'); }
+        else { say('⚠️ hiccup: '+((e&&e.message)||e)); }
+      }
+    };
+  })();
+  </script>
+
+  <h2>✦ JUMP IN — FOUR LANES OPEN ✦</h2>
   <div class="rule"></div>
 
   <div class="lane">
